@@ -5,6 +5,6 @@ markets:
     timezone: "UTC"
 
   aeso:
-    csv_dir: "data/aeso/csv/"
+    csv_dir: "data/aeso_rawcsv"
     default_city: "Red Deer"
-    timezone: "UTC"
+    timezone: "America/Edmonton"

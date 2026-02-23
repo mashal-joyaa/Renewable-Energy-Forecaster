@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import yaml
+from fastapi import HTTPException
 
 from models.regression_engine import run_both_models
 from pipelines.ieso_pipeline import build_ieso_master
@@ -23,6 +24,29 @@ class UniversalPipeline:
         os.makedirs(market_dir, exist_ok=True)
         return {"market_output_dir": market_dir}
 
+    def _run_model_safe(
+        self,
+        csv_path: str,
+        target: str,
+        features: list[str],
+        label: str,
+    ) -> dict:
+        """
+        Run regression for one fuel type.  On success returns the normal
+        run_both_models dict.  On failure (e.g. insufficient data for an
+        upload-only fuel type) returns {"skipped": True, "reason": str(e)}
+        so the other fuel type can still be reported.
+        """
+        try:
+            return run_both_models(
+                csv_path=csv_path,
+                target=target,
+                features=features,
+                label=label,
+            )
+        except Exception as e:
+            return {"skipped": True, "reason": str(e)}
+
     def run_market(
         self,
         market: str,
@@ -30,6 +54,27 @@ class UniversalPipeline:
         upload_mode: str | None = None,
         file_format: str | None = None,
         files=None,
+        timezone: str | None = None,
+    ):
+        try:
+            return self._run_market_inner(
+                market, city, upload_mode, file_format, files, timezone
+            )
+        except HTTPException:
+            raise
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Pipeline error [{market}]: {e}")
+
+    def _run_market_inner(
+        self,
+        market: str,
+        city: str,
+        upload_mode,
+        file_format,
+        files,
+        timezone: str | None = None,
     ):
         # ---------------- UPLOAD MARKET ----------------
         if market == "upload":
@@ -44,7 +89,7 @@ class UniversalPipeline:
                 files=files,
                 output_dir=market_output_dir,
                 city=city,
-                timezone="UTC",
+                timezone=timezone or "UTC",
             )
 
         else:
@@ -53,23 +98,23 @@ class UniversalPipeline:
             market_output_dir = paths["market_output_dir"]
 
             if market == "ieso":
-                xml_dir = self.config["markets"]["ieso"]["xml_dir"]
-
+                xml_dir  = os.path.join(BASE_DIR, self.config["markets"]["ieso"]["xml_dir"])
+                tz       = self.config["markets"]["ieso"].get("timezone", "UTC")
                 master_path = build_ieso_master(
                     xml_dir=xml_dir,
                     output_dir=market_output_dir,
                     city=city,
-                    timezone="UTC",
+                    timezone=tz,
                 )
 
             elif market == "aeso":
-                input_dir = self.config["markets"]["aeso"]["csv_dir"]
-
+                input_dir = os.path.join(BASE_DIR, self.config["markets"]["aeso"]["csv_dir"])
+                tz        = self.config["markets"]["aeso"].get("timezone", "America/Edmonton")
                 master_path = build_aeso_master(
                     input_dir=input_dir,
                     output_dir=market_output_dir,
                     city=city,
-                    timezone="UTC",
+                    timezone=tz,
                 )
 
             else:
@@ -79,39 +124,51 @@ class UniversalPipeline:
         df = pd.read_csv(master_path)
         df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-        wind_cols = ["timestamp", "Wind", "temperature", "wind_speed", "wind_direction"]
-        solar_cols = ["timestamp", "Solar", "temperature", "cloud_cover"]
+        wind_cols  = ["timestamp", "Wind",  "temperature_2m", "windspeed_10m", "winddirection_10m"]
+        solar_cols = ["timestamp", "Solar", "temperature_2m", "cloudcover", "shortwave_radiation"]
 
-        wind_df = df.dropna(subset=["Wind"])[wind_cols]
+        wind_features  = ["temperature_2m", "windspeed_10m", "winddirection_10m"]
+        solar_features = ["temperature_2m", "cloudcover", "shortwave_radiation"]
+
+        missing_wind  = [c for c in wind_cols  if c not in df.columns]
+        missing_solar = [c for c in solar_cols if c not in df.columns]
+        if missing_wind:
+            raise ValueError(f"Master CSV missing columns for wind model: {missing_wind}")
+        if missing_solar:
+            raise ValueError(f"Master CSV missing columns for solar model: {missing_solar}")
+
+        wind_df  = df.dropna(subset=["Wind"])[wind_cols]
         solar_df = df.dropna(subset=["Solar"])[solar_cols]
 
-        wind_csv_path = os.path.join(market_output_dir, "wind_model_data.csv")
+        wind_csv_path  = os.path.join(market_output_dir, "wind_model_data.csv")
         solar_csv_path = os.path.join(market_output_dir, "solar_model_data.csv")
 
-        wind_df.to_csv(wind_csv_path, index=False)
+        wind_df.to_csv(wind_csv_path,   index=False)
         solar_df.to_csv(solar_csv_path, index=False)
 
         # ---------------- RUN MODELS ----------------
-        wind_results = run_both_models(
+        # _run_model_safe returns a skipped sentinel instead of raising if a
+        # fuel type has insufficient data (e.g. wind-only or solar-only uploads).
+        wind_results = self._run_model_safe(
             csv_path=wind_csv_path,
             target="Wind",
-            features=["temperature", "wind_speed", "wind_direction"],
+            features=wind_features,
             label=f"{market.upper()}_Wind",
         )
 
-        solar_results = run_both_models(
+        solar_results = self._run_model_safe(
             csv_path=solar_csv_path,
             target="Solar",
-            features=["temperature", "cloud_cover"],
+            features=solar_features,
             label=f"{market.upper()}_Solar",
         )
 
         return {
             "market": market,
             "city": city,
-            "wind": wind_results,
+            "wind":  wind_results,
             "solar": solar_results,
             "master_path": master_path,
-            "wind_csv": wind_csv_path,
-            "solar_csv": solar_csv_path,
+            "wind_csv":    wind_csv_path,
+            "solar_csv":   solar_csv_path,
         }

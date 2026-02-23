@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c:*)",
+      "Bash(ls:*)",
+      "Bash(venv/Scripts/python.exe -c \"import fastapi, uvicorn, sklearn, pandas, numpy, matplotlib, yaml, requests; print\\(''All deps OK''\\)\")",
+      "Bash(curl:*)",
+      "Bash(netstat:*)",
+      "Bash(xargs:*)",
+      "Bash(taskkill:*)",
+      "Bash(cmd /c \"taskkill /PID 1368 /F\")",
+      "Bash(find:*)",
+      "Bash(head:*)",
+      "Bash(python -:*)",
+      "Bash(tasklist:*)",
+      "Bash(# Try killing PID 1368 from Windows side cmd.exe /c \"\"taskkill /PID 1368 /F\"\" || true sleep 2 netstat -ano)",
+      "Bash(python -m json.tool:*)",
+      "Bash(\"venv/Scripts/uvicorn.exe\" app.main:app --reload --port 8000)",
+      "Bash(uvicorn app.main:app:*)",
+      "Bash(python -m uvicorn:*)",
+      "Bash(pip show:*)",
+      "Bash(source:*)"
+    ]
+  }
+}

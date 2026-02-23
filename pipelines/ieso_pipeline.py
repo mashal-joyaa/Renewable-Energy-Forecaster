@@ -26,10 +26,13 @@ def build_ieso_master(xml_dir, output_dir, city, timezone):
             all_rows.extend(parse_xml_to_rows(xml_path))
 
     if not all_rows:
-        raise RuntimeError("No IESO data parsed")
+        raise RuntimeError("No IESO data parsed from XML files.")
 
     all_rows = trim_last_2p5_years(all_rows)
     all_rows.sort(key=lambda r: r["timestamp"])
+
+    if not all_rows:
+        raise RuntimeError("No IESO rows remain after trimming to last 2.5 years.")
 
     start_date = all_rows[0]["timestamp"].split()[0]
     end_date = all_rows[-1]["timestamp"].split()[0]
@@ -43,6 +46,13 @@ def build_ieso_master(xml_dir, output_dir, city, timezone):
         ts = r["timestamp"]
         if ts in weather_map:
             merged.append({**r, **weather_map[ts]})
+
+    if not merged:
+        raise RuntimeError(
+            f"IESO weather merge produced no rows. "
+            f"Generation timestamps sample: {[r['timestamp'] for r in all_rows[:3]]}. "
+            f"Weather timestamps sample: {list(weather_map.keys())[:3]}."
+        )
 
     os.makedirs(output_dir, exist_ok=True)
     out_path = os.path.join(output_dir, "ieso_master.csv")
