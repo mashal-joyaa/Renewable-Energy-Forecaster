@@ -3,7 +3,7 @@ Installation
 
 Code
 
-git clone <your-repo-url>
+git clone (https://github.com/mashal-joyaa/Renewable-Energy-Forecaster.git)
 
 cd capstone_prototype
 
