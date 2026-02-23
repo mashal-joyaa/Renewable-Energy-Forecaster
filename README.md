@@ -3,9 +3,9 @@ Installation
 
 Code
 
-git clone (https://github.com/mashal-joyaa/Renewable-Energy-Forecaster.git)
+git clone https://github.com/mashal-joyaa/Renewable-Energy-Forecaster.git
 
-cd capstone_prototype
+cd Renewable-Energy-Forecaster 
 
 2. Create a virtual environment
 
