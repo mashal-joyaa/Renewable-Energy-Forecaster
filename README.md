@@ -1,19 +1,30 @@
 Installation
 1. Clone the project
+
 Code
+
 git clone <your-repo-url>
+
 cd capstone_prototype
 
 2. Create a virtual environment
+
 Code
+
 python -m venv venv
+
 source venv/bin/activate   # Mac/Linux
+
 venv\Scripts\activate      # Windows
 
 3. Install dependencies
+
 Code
+
 pip install -r requirements.txt
+
 ▶️ Running the API
+
 Start the FastAPI server:
 
 Code
