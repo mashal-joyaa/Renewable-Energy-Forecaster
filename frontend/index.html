@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Wind and Solar Power Forecaster</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -55,7 +56,6 @@
       max-width: 500px;
       line-height: 1.6;
     }
-    /* Soft sun glow in the upper-right sky */
     .hero::before {
       content: '';
       position: absolute;
@@ -79,52 +79,42 @@
     }
     .landscape svg { display: block; width: 100%; }
 
-    /* ── STICKY NAV ───────────────────────────────────────────── */
-    .nav-outer {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: #2d6a4a;
-      padding: 0.7rem 1rem;
-      display: flex;
-      justify-content: center;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.18);
-    }
-    .tab-pill {
-      display: inline-flex;
-      background: rgba(255,255,255,0.14);
-      border-radius: 12px;
-      padding: 0.25rem;
-      gap: 0.2rem;
-    }
-    .tab-btn {
-      padding: 0.55rem 1.55rem;
-      border: none;
-      background: transparent;
-      cursor: pointer;
-      font-size: 0.88rem;
-      font-weight: 500;
-      color: rgba(255,255,255,0.72);
-      border-radius: 9px;
-      transition: background 0.15s, color 0.15s, box-shadow 0.15s;
-      white-space: nowrap;
-      display: flex;
-      align-items: center;
-      gap: 0.45rem;
-    }
-    .tab-btn:hover { color: white; background: rgba(255,255,255,0.1); }
-    .tab-btn.active {
-      background: white;
-      color: #1a4731;
-      font-weight: 700;
-      box-shadow: 0 1px 5px rgba(0,0,0,0.16);
-    }
-
     /* ── LAYOUT ───────────────────────────────────────────────── */
     main { max-width: 1200px; margin: 0 auto; padding: 2.5rem 2rem 5rem; }
 
     .panel { display: none; }
     .panel.active { display: block; }
+
+    /* ── Source selector card ─────────────────────────────────── */
+    .source-card {
+      background: white;
+      border-radius: 16px;
+      padding: 1.1rem 2rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+      margin-bottom: 1.25rem;
+      border: 1px solid rgba(0,0,0,0.04);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .source-card label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      white-space: nowrap;
+    }
+    .source-card select {
+      padding: 0.55rem 0.9rem;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      background: #f9fafb;
+      color: #1e293b;
+      cursor: pointer;
+      min-width: 230px;
+    }
 
     /* ── Run card ─────────────────────────────────────────────── */
     .run-card {
@@ -165,6 +155,29 @@
     .btn-run:hover:not(:disabled) { background: #1e40af; box-shadow: 0 4px 14px rgba(29,78,216,0.4); }
     .btn-run:active  { transform: scale(0.97); }
     .btn-run:disabled { background: #94a3b8; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    /* ── Download buttons ─────────────────────────────────────── */
+    .download-row {
+      display: flex;
+      gap: 0.75rem;
+      padding: 0.75rem 1.4rem 1.25rem;
+      flex-wrap: wrap;
+    }
+    .btn-download {
+      background: white;
+      color: #1d4ed8;
+      border: 1.5px solid #1d4ed8;
+      border-radius: 10px;
+      padding: 0.6rem 1.25rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-download:hover { background: #eff6ff; }
 
     /* spinner */
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -231,7 +244,6 @@
       overflow: hidden;
       border: 1px solid rgba(0,0,0,0.04);
     }
-    /* Colored top accent per fuel type */
     .fuel-wind  { border-top: 4px solid #1d4ed8; }
     .fuel-solar { border-top: 4px solid #d97706; }
 
@@ -293,7 +305,6 @@
     .r2-num  { font-size: 2.8rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
     .r2-meta { font-size: 0.73rem; color: #94a3b8; font-weight: 500; margin: 0.28rem 0 0.55rem; }
 
-    /* R² progress bar */
     .r2-bar-track {
       height: 6px;
       background: #f1f5f9;
@@ -434,9 +445,14 @@
       gap: 1.25rem;
       align-items: start;
     }
-    .forecast-map-wrap {
+    .forecast-left-col {
       position: sticky;
       top: 70px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .forecast-map-wrap {
       background: white;
       border-radius: 16px;
       overflow: hidden;
@@ -444,7 +460,7 @@
       border: 1px solid rgba(0,0,0,0.04);
       border-top: 4px solid #0f766e;
     }
-    .forecast-map { height: 320px; width: 100%; }
+    .forecast-map { height: 220px; width: 100%; }
     .forecast-map-caption {
       padding: 0.7rem 1rem 0.8rem;
       font-size: 0.8rem;
@@ -454,7 +470,62 @@
     }
     .forecast-map-caption strong { color: #0f172a; }
     .forecast-map-caption small  { color: #94a3b8; font-size: 0.72rem; }
-    .forecast-table-wrap { min-width: 0; }
+
+    /* ── Weather module ────────────────────────────────────────── */
+    .weather-module {
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+      border: 1px solid rgba(0,0,0,0.04);
+      border-top: 4px solid #6366f1;
+    }
+    .weather-module-hdr {
+      padding: 0.65rem 1rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      border-bottom: 1px solid #f1f5f9;
+      background: #fafbff;
+    }
+    .weather-table-scroll {
+      max-height: 260px;
+      overflow-y: auto;
+    }
+    .weather-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.7rem;
+    }
+    .weather-table thead th {
+      position: sticky;
+      top: 0;
+      background: #f8fafc;
+      padding: 0.38rem 0.5rem;
+      text-align: right;
+      font-weight: 700;
+      color: #64748b;
+      border-bottom: 1px solid #e2e8f0;
+      white-space: nowrap;
+    }
+    .weather-table thead th:first-child { text-align: left; }
+    .weather-table tbody td {
+      padding: 0.28rem 0.5rem;
+      text-align: right;
+      color: #334155;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .weather-table tbody td:first-child { text-align: left; color: #64748b; font-size: 0.67rem; }
+    .weather-table tbody tr:nth-child(even) td { background: #f8fafc; }
+
+    .forecast-charts-col {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      min-width: 0;
+    }
     .forecast-run-bar {
       display: flex;
       align-items: center;
@@ -486,48 +557,15 @@
       overflow: hidden;
       animation: fadeUp 0.35s ease;
       border: 1px solid rgba(0,0,0,0.04);
-      border-top: 4px solid #0f766e;
     }
+    .forecast-wrap.forecast-wind  { border-top: 4px solid #3b82f6; }
+    .forecast-wrap.forecast-solar { border-top: 4px solid #f59e0b; }
     .forecast-meta {
       padding: 0.9rem 1.4rem;
       font-size: 0.84rem;
       color: #475569;
       border-bottom: 1px solid #f1f5f9;
     }
-    .forecast-day-hdr {
-      background: #f0fdf4;
-      padding: 0.55rem 1.4rem;
-      font-size: 0.74rem;
-      font-weight: 700;
-      color: #15803d;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      border-bottom: 1px solid #dcfce7;
-    }
-    .forecast-tbl { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-    .forecast-tbl th {
-      background: #f8fafc;
-      padding: 0.48rem 0.9rem;
-      text-align: left;
-      color: #94a3b8;
-      font-size: 0.67rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      border-bottom: 1px solid #e2e8f0;
-    }
-    .forecast-tbl td {
-      padding: 0.38rem 0.9rem;
-      border-bottom: 1px solid #f8fafc;
-      vertical-align: middle;
-    }
-    .forecast-tbl tr:hover td { background: #f8fafc; }
-    .fc-time     { white-space: nowrap; font-weight: 500; color: #1e293b; }
-    .fc-time-est { white-space: nowrap; color: #64748b; font-size: 0.79rem; }
-    .fc-val      { text-align: right; font-family: "Courier New", monospace; min-width: 62px; color: #1e293b; }
-    .fc-bar-cell { width: 130px; padding-left: 0.5rem; }
-    .fc-bar      { height: 9px; border-radius: 3px; min-width: 2px; }
-    .fc-bar-wind  { background: #3b82f6; }
-    .fc-bar-solar { background: #f59e0b; }
 
     /* ── Lightbox ─────────────────────────────────────────────── */
     .lightbox {
@@ -565,15 +603,14 @@
       .model-col    { border-right: none; border-bottom: 1px solid #f1f5f9; }
       .plots-row    { grid-template-columns: 1fr; }
       .form-split   { grid-template-columns: 1fr; }
-      .tab-btn      { padding: 0.5rem 1rem; font-size: 0.82rem; }
       .run-card     { padding: 1.25rem; }
-      .fc-bar-cell      { display: none; }
-      .forecast-tbl     { font-size: 0.76rem; }
       .hero h1          { font-size: 1.65rem; }
       .hero             { padding: 2rem 1.25rem 3rem; min-height: 170px; }
       .forecast-layout  { grid-template-columns: 1fr; }
-      .forecast-map     { height: 240px; }
-      .forecast-map-wrap { position: static; }
+      .forecast-map     { height: 200px; }
+      .forecast-left-col { position: static; }
+      .source-card  { flex-wrap: wrap; }
+      .source-card select { min-width: 0; width: 100%; }
     }
   </style>
 </head>
@@ -587,24 +624,22 @@
 </div>
 
 <!-- ── LANDSCAPE DIVIDER ─────────────────────────────────────── -->
-<!-- Green rectangle = ground; sky-blue wave path = horizon rolling over it -->
 <div class="landscape">
   <svg viewBox="0 0 1440 80" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
 
     <!-- Ground -->
     <rect width="1440" height="80" fill="#2d6a4a"/>
 
-    <!-- Sky fill — covers y=0 down to the rolling horizon line -->
+    <!-- Sky fill -->
     <path d="M0,55 C180,15 380,75 640,38 C880,5 1100,68 1300,32 C1380,16 1420,42 1440,28 L1440,0 L0,0 Z"
           fill="#38bdf8"/>
 
-    <!-- ── SUN GLOW (sky region, upper-right) ─────────────────── -->
+    <!-- ── SUN GLOW ─────────────────────────────────────────────── -->
     <circle cx="1200" cy="16" r="9"  fill="rgba(255,253,200,0.26)"/>
     <circle cx="1200" cy="16" r="15" fill="rgba(255,253,200,0.10)"/>
     <circle cx="1200" cy="16" r="22" fill="rgba(255,253,200,0.04)"/>
 
-    <!-- ── WIND TURBINE 1 — left hilltop (x≈160, wave≈y20) ───── -->
-    <!-- Tower tapers from base to hub; blades radiate at 0°/120°/240° from vertical -->
+    <!-- ── WIND TURBINE 1 ───────────────────────────────────────── -->
     <g fill="rgba(255,255,255,0.22)">
       <polygon points="158.8,42 161.2,42 160.5,20 159.5,20"/>
       <polygon points="159.5,20 160.5,20 160,12"/>
@@ -613,7 +648,7 @@
       <circle  cx="160" cy="20" r="1.3"/>
     </g>
 
-    <!-- ── WIND TURBINE 2 — central hilltop (x≈900, wave≈y10) ── -->
+    <!-- ── WIND TURBINE 2 ───────────────────────────────────────── -->
     <g fill="rgba(255,255,255,0.22)">
       <polygon points="898.8,38 901.2,38 900.6,12 899.4,12"/>
       <polygon points="899.5,12 900.5,12 900,2"/>
@@ -622,7 +657,7 @@
       <circle  cx="900" cy="12" r="1.5"/>
     </g>
 
-    <!-- ── WIND TURBINE 3 — right hilltop (x≈1300, wave≈y32) ─── -->
+    <!-- ── WIND TURBINE 3 ───────────────────────────────────────── -->
     <g fill="rgba(255,255,255,0.20)">
       <polygon points="1298.8,58 1301.2,58 1300.5,38 1299.5,38"/>
       <polygon points="1299.5,38 1300.5,38 1300,31"/>
@@ -631,7 +666,7 @@
       <circle  cx="1300" cy="38" r="1.2"/>
     </g>
 
-    <!-- ── SOLAR PANELS 1 — center-left valley floor (x≈490) ─── -->
+    <!-- ── SOLAR PANELS 1 ───────────────────────────────────────── -->
     <g fill="rgba(255,255,255,0.15)">
       <rect x="476" y="65" width="9" height="4"/>
       <rect x="487" y="65" width="9" height="4"/>
@@ -641,7 +676,7 @@
       <rect x="498" y="71" width="9" height="4"/>
     </g>
 
-    <!-- ── SOLAR PANELS 2 — center-right valley floor (x≈1060) ── -->
+    <!-- ── SOLAR PANELS 2 ───────────────────────────────────────── -->
     <g fill="rgba(255,255,255,0.15)">
       <rect x="1046" y="66" width="9" height="4"/>
       <rect x="1057" y="66" width="9" height="4"/>
@@ -654,143 +689,170 @@
   </svg>
 </div>
 
-<!-- ── STICKY NAV ─────────────────────────────────────────────── -->
-<div class="nav-outer">
-  <div class="tab-pill">
-    <button class="tab-btn active" onclick="switchTab('ieso', this)">IESO — Ontario</button>
-    <button class="tab-btn"        onclick="switchTab('aeso', this)">AESO — Alberta</button>
-    <button class="tab-btn"        onclick="switchTab('upload', this)">Upload Data</button>
-  </div>
-</div>
-
 <!-- ── MAIN ───────────────────────────────────────────────────── -->
 <main>
 
-  <!-- IESO Panel -->
-  <div id="panel-ieso" class="panel active">
-    <div class="run-card">
+  <div id="panel-main" class="panel active">
+
+    <!-- Source selector (always visible) -->
+    <div class="source-card">
+      <label for="sel-source">Data Source</label>
+      <select id="sel-source" onchange="onSourceChange()">
+        <option value="ieso">IESO — Ontario</option>
+        <option value="aeso">AESO — Alberta</option>
+        <option value="upload">Upload Your Own Data</option>
+      </select>
+    </div>
+
+    <!-- Run card (shown for ieso / aeso) -->
+    <div class="run-card" id="run-card">
       <div class="run-card-info">
-        <h2>Ontario Grid — IESO</h2>
-        <p>Weather city: <strong>Goderich, ON</strong> &nbsp;·&nbsp; Source: IESO public XML reports &nbsp;·&nbsp; ~2.5 years of hourly data</p>
+        <h2 id="run-card-title">Ontario Grid — IESO</h2>
+        <p id="run-card-desc">Weather city: <strong>Goderich, ON</strong> &nbsp;·&nbsp; Source: IESO public XML reports &nbsp;·&nbsp; ~2.5 years of hourly data</p>
       </div>
-      <button class="btn-run" id="btn-ieso" onclick="runMarket('ieso')">
+      <button class="btn-run" id="btn-main" onclick="runMarket()">
         <div class="spinner"></div>
-        <span class="btn-label">▶&nbsp; Run Pipeline</span>
+        <span class="btn-label">&#9654;&nbsp; Run Pipeline</span>
       </button>
     </div>
-    <div class="banner" id="banner-ieso"></div>
-    <div class="results" id="results-ieso"></div>
-  </div>
 
-  <!-- AESO Panel -->
-  <div id="panel-aeso" class="panel">
-    <div class="run-card">
-      <div class="run-card-info">
-        <h2>Alberta Grid — AESO</h2>
-        <p>Weather city: <strong>Red Deer, AB</strong> &nbsp;·&nbsp; Source: AESO historical CSV reports &nbsp;·&nbsp; ~2.5 years of hourly data</p>
+    <!-- Upload section (shown when "upload" is selected) -->
+    <div id="upload-section" style="display:none;">
+      <div class="upload-card">
+        <form id="upload-form">
+          <div class="form-section-title">Configuration</div>
+          <div class="form-split">
+            <div class="form-row">
+              <label for="sel-mode">Upload Mode</label>
+              <select id="sel-mode" name="upload_mode">
+                <option value="single">Single file</option>
+                <option value="multi">Multiple files (merged)</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label for="sel-format">Market Format</label>
+              <select id="sel-format" name="market_format">
+                <option value="aeso">AESO — CSV</option>
+                <option value="ieso">IESO — XML</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-split">
+            <div class="form-row">
+              <label for="sel-province">Province</label>
+              <select id="sel-province" name="province" onchange="updateCityVisibility()">
+                <option value="alberta">Alberta</option>
+                <option value="ontario">Ontario</option>
+                <option value="other">Other (specify city below)</option>
+              </select>
+            </div>
+            <div class="form-row" id="city-row" style="display:none;">
+              <label for="inp-city">City</label>
+              <input type="text" id="inp-city" name="other_city" placeholder="e.g. Calgary" />
+            </div>
+          </div>
+
+          <div class="form-section-title" style="margin-top:0.5rem;">Data File(s)</div>
+          <div class="dropzone" id="dropzone">
+            <p id="file-label">Drag &amp; drop files here, or click to browse</p>
+            <small>Accepted: .csv (AESO format) &nbsp;·&nbsp; .xml (IESO format)</small>
+            <input type="file" id="file-input" name="files" multiple accept=".csv,.xml"
+                   style="display:none" onchange="updateFileLabel()" />
+          </div>
+
+          <button type="submit" class="btn-run" id="btn-upload"
+                  style="width:100%; margin-top:1.5rem;">
+            <div class="spinner"></div>
+            <span class="btn-label">Upload &amp; Run Pipeline</span>
+          </button>
+        </form>
       </div>
-      <button class="btn-run" id="btn-aeso" onclick="runMarket('aeso')">
-        <div class="spinner"></div>
-        <span class="btn-label">▶&nbsp; Run Pipeline</span>
-      </button>
-    </div>
-    <div class="banner" id="banner-aeso"></div>
-    <div class="results" id="results-aeso"></div>
-  </div>
-
-  <!-- Upload Panel -->
-  <div id="panel-upload" class="panel">
-    <div class="upload-card">
-      <div class="banner" id="banner-upload"></div>
-
-      <form id="upload-form">
-        <div class="form-section-title">Configuration</div>
-        <div class="form-split">
-          <div class="form-row">
-            <label for="sel-mode">Upload Mode</label>
-            <select id="sel-mode" name="upload_mode">
-              <option value="single">Single file</option>
-              <option value="multi">Multiple files (merged)</option>
-            </select>
-          </div>
-          <div class="form-row">
-            <label for="sel-format">Market Format</label>
-            <select id="sel-format" name="market_format">
-              <option value="aeso">AESO — CSV</option>
-              <option value="ieso">IESO — XML</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-split">
-          <div class="form-row">
-            <label for="sel-province">Province</label>
-            <select id="sel-province" name="province" onchange="updateCityVisibility()">
-              <option value="alberta">Alberta</option>
-              <option value="ontario">Ontario</option>
-              <option value="other">Other (specify city below)</option>
-            </select>
-          </div>
-          <div class="form-row" id="city-row" style="display:none;">
-            <label for="inp-city">City</label>
-            <input type="text" id="inp-city" name="other_city" placeholder="e.g. Calgary" />
-          </div>
-        </div>
-
-        <div class="form-section-title" style="margin-top:0.5rem;">Data File(s)</div>
-        <div class="dropzone" id="dropzone">
-          <p id="file-label">Drag &amp; drop files here, or click to browse</p>
-          <small>Accepted: .csv (AESO format) &nbsp;·&nbsp; .xml (IESO format)</small>
-          <input type="file" id="file-input" name="files" multiple accept=".csv,.xml"
-                 style="display:none" onchange="updateFileLabel()" />
-        </div>
-
-        <button type="submit" class="btn-run" id="btn-upload"
-                style="width:100%; margin-top:1.5rem;">
-          <div class="spinner"></div>
-          <span class="btn-label">Upload &amp; Run Pipeline</span>
-        </button>
-      </form>
     </div>
 
-    <div class="results" id="results-upload"></div>
+    <div class="banner" id="banner-main"></div>
+    <div class="results" id="results-main"></div>
+
   </div>
 
 </main>
 
 <!-- ── Lightbox ───────────────────────────────────────────────── -->
 <div class="lightbox" id="lightbox" onclick="closeLightbox()">
-  <span class="lb-close" onclick="closeLightbox()">✕</span>
+  <span class="lb-close" onclick="closeLightbox()">&#x2715;</span>
   <img id="lb-img" src="" alt="Plot" onclick="event.stopPropagation()" />
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-  // ── Tab switching ─────────────────────────────────────────────
-  function switchTab(name, btn) {
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('panel-' + name).classList.add('active');
-    btn.classList.add('active');
+  // ── Global chart instances ────────────────────────────────────
+  let windChart = null;
+  let solarChart = null;
+
+  // ── Source descriptions ───────────────────────────────────────
+  const SOURCE_INFO = {
+    ieso: {
+      title: 'Ontario Grid — IESO',
+      desc:  'Weather city: <strong>Goderich, ON</strong> &nbsp;&middot;&nbsp; Source: IESO public XML reports &nbsp;&middot;&nbsp; ~2.5 years of hourly data'
+    },
+    aeso: {
+      title: 'Alberta Grid — AESO',
+      desc:  'Weather city: <strong>Red Deer, AB</strong> &nbsp;&middot;&nbsp; Source: AESO historical CSV reports &nbsp;&middot;&nbsp; ~2.5 years of hourly data'
+    },
+    upload: {
+      title: 'Upload Your Own Data',
+      desc:  'Select and upload your own CSV (AESO format) or XML (IESO format) generation data files.'
+    }
+  };
+
+  // ── Source selector change ────────────────────────────────────
+  function onSourceChange() {
+    const val      = document.getElementById('sel-source').value;
+    const isUpload = val === 'upload';
+
+    document.getElementById('run-card').style.display      = isUpload ? 'none' : '';
+    document.getElementById('upload-section').style.display = isUpload ? 'block' : 'none';
+
+    if (!isUpload) {
+      const info = SOURCE_INFO[val];
+      document.getElementById('run-card-title').textContent = info.title;
+      document.getElementById('run-card-desc').innerHTML    = info.desc;
+    }
+
+    // Clear previous results
+    const banner = document.getElementById('banner-main');
+    const resEl  = document.getElementById('results-main');
+    banner.className  = 'banner';
+    banner.textContent = '';
+    resEl.className   = 'results';
+    resEl.innerHTML   = '';
+
+    if (windChart)  { windChart.destroy();  windChart  = null; }
+    if (solarChart) { solarChart.destroy(); solarChart = null; }
+    window._lastForecastData = null;
   }
 
   // ── Run market (IESO / AESO) ──────────────────────────────────
-  async function runMarket(market) {
-    const btn    = document.getElementById('btn-' + market);
-    const banner = document.getElementById('banner-' + market);
-    const resEl  = document.getElementById('results-' + market);
+  async function runMarket() {
+    const market = document.getElementById('sel-source').value;
+    const btn    = document.getElementById('btn-main');
+    const banner = document.getElementById('banner-main');
+    const resEl  = document.getElementById('results-main');
 
     btn.classList.add('loading');
     btn.disabled = true;
-    banner.className = 'banner';
+    banner.className  = 'banner';
     banner.textContent = '';
-    resEl.className = 'results';
+    resEl.className   = 'results';
+    resEl.innerHTML   = '';
+    if (windChart)  { windChart.destroy();  windChart  = null; }
+    if (solarChart) { solarChart.destroy(); solarChart = null; }
 
     try {
       const res  = await fetch(`/run-${market}`);
       const data = await res.json();
 
       if (!res.ok) {
-        banner.className = 'banner error';
+        banner.className  = 'banner error';
         banner.textContent = `Error ${res.status}: ${data.detail ?? JSON.stringify(data)}`;
         return;
       }
@@ -803,7 +865,7 @@
       );
 
     } catch (err) {
-      banner.className = 'banner error';
+      banner.className  = 'banner error';
       banner.textContent = `Network error: ${err.message}`;
     } finally {
       btn.classList.remove('loading');
@@ -816,22 +878,25 @@
     e.preventDefault();
 
     const fileInput = document.getElementById('file-input');
+    const banner    = document.getElementById('banner-main');
+
     if (!fileInput.files.length) {
-      const banner = document.getElementById('banner-upload');
-      banner.className = 'banner error';
+      banner.className  = 'banner error';
       banner.textContent = 'Please select at least one file before submitting.';
       return;
     }
 
-    const btn    = document.getElementById('btn-upload');
-    const banner = document.getElementById('banner-upload');
-    const resEl  = document.getElementById('results-upload');
+    const btn   = document.getElementById('btn-upload');
+    const resEl = document.getElementById('results-main');
 
     btn.classList.add('loading');
     btn.disabled = true;
-    banner.className = 'banner';
+    banner.className  = 'banner';
     banner.textContent = '';
-    resEl.className = 'results';
+    resEl.className   = 'results';
+    resEl.innerHTML   = '';
+    if (windChart)  { windChart.destroy();  windChart  = null; }
+    if (solarChart) { solarChart.destroy(); solarChart = null; }
 
     try {
       const formData = new FormData(this);
@@ -839,7 +904,7 @@
       const data = await res.json();
 
       if (!res.ok) {
-        banner.className = 'banner error';
+        banner.className  = 'banner error';
         banner.textContent = `Error ${res.status}: ${data.detail ?? JSON.stringify(data)}`;
         return;
       }
@@ -852,7 +917,7 @@
       );
 
     } catch (err) {
-      banner.className = 'banner error';
+      banner.className  = 'banner error';
       banner.textContent = `Network error: ${err.message}`;
     } finally {
       btn.classList.remove('loading');
@@ -919,11 +984,11 @@
           <button class="btn-run btn-forecast" id="btn-forecast-${d.market}"
                   onclick="runForecast('${d.market}', '${esc(d.city)}')">
             <div class="spinner"></div>
-            <span class="btn-label">▶ Run Forecast</span>
+            <span class="btn-label">&#9654; Run Forecast</span>
           </button>
         </div>
         <div class="banner" id="banner-forecast-${d.market}"></div>
-        <div id="forecast-table-${d.market}"></div>
+        <div id="forecast-chart-wrap-${d.market}"></div>
       </div>
     `;
   }
@@ -932,12 +997,15 @@
   async function runForecast(market, city) {
     const btn    = document.getElementById(`btn-forecast-${market}`);
     const banner = document.getElementById(`banner-forecast-${market}`);
-    const tbl    = document.getElementById(`forecast-table-${market}`);
+    const wrap   = document.getElementById(`forecast-chart-wrap-${market}`);
 
     btn.classList.add('loading');
     btn.disabled = true;
-    banner.className = 'banner';
-    tbl.innerHTML = '';
+    banner.className  = 'banner';
+    banner.textContent = '';
+    if (wrap) wrap.innerHTML = '';
+    if (windChart)  { windChart.destroy();  windChart  = null; }
+    if (solarChart) { solarChart.destroy(); solarChart = null; }
 
     try {
       const url  = `/run-forecast?market=${encodeURIComponent(market)}&city=${encodeURIComponent(city)}`;
@@ -945,14 +1013,17 @@
       const data = await res.json();
 
       if (!res.ok) {
-        banner.className = 'banner error';
+        banner.className  = 'banner error';
         banner.textContent = data.detail ?? JSON.stringify(data);
         return;
       }
 
-      tbl.innerHTML = buildForecastTable(data);
+      if (wrap) {
+        wrap.innerHTML = buildForecastChartHTML(data);
+        initForecastCharts(data);
+      }
 
-      // Initialise Leaflet map on the freshly-rendered container
+      // Initialise Leaflet map
       if (data.lat != null && data.lon != null && window.L) {
         const mapEl = document.getElementById(`map-${market}`);
         if (mapEl) {
@@ -969,7 +1040,7 @@
       }
 
     } catch (err) {
-      banner.className = 'banner error';
+      banner.className  = 'banner error';
       banner.textContent = `Network error: ${err.message}`;
     } finally {
       btn.classList.remove('loading');
@@ -977,79 +1048,228 @@
     }
   }
 
-  // ── Build forecast table ──────────────────────────────────────
-  function buildForecastTable(data) {
-    const tz  = data.city_timezone;
-    const opt = {
-      hour: 'numeric', minute: '2-digit',
-      weekday: 'short', month: 'short', day: 'numeric',
-      hour12: true
-    };
-    const localFmt = new Intl.DateTimeFormat('en-US', { ...opt, timeZone: tz });
-    const estFmt   = new Intl.DateTimeFormat('en-US', { ...opt, timeZone: 'America/New_York' });
-
-    const maxWind  = Math.max(...data.hours.map(h => h.wind_mw),  1);
-    const maxSolar = Math.max(...data.hours.map(h => h.solar_mw), 1);
-
-    // Group into 2 × 24-hour days
-    const days = [[], []];
-    data.hours.forEach((h, i) => days[Math.floor(i / 24)].push(h));
-
-    let tableHtml = `<div class="forecast-wrap">
-      <div class="forecast-meta">
-        <strong>${esc(data.city)}</strong> &nbsp;·&nbsp;
-        Local time: <em>${esc(tz)}</em> &nbsp;·&nbsp; Eastern Time: <em>America/New_York</em>
-        &nbsp;·&nbsp; Linear regression · weather-driven &nbsp;·&nbsp; Next 48 hours
-      </div>`;
-
-    days.forEach((day, di) => {
-      const firstDt   = new Date(day[0].utc_iso + ':00Z');
-      const dayHeader = localFmt.format(firstDt).split(',').slice(0, 2).join(',').trim();
-
-      tableHtml += `
-        <div class="forecast-day-hdr">Day ${di + 1} — ${dayHeader}</div>
-        <table class="forecast-tbl">
-          <thead><tr>
-            <th>Local Time</th>
-            <th>Eastern Time</th>
-            <th style="text-align:right">Wind MW</th>
-            <th style="width:130px"></th>
-            <th style="text-align:right">Solar MW</th>
-            <th style="width:130px"></th>
-          </tr></thead>
-          <tbody>`;
-
-      day.forEach(h => {
-        const dt   = new Date(h.utc_iso + ':00Z');
-        const wPct = (h.wind_mw  / maxWind  * 100).toFixed(1);
-        const sPct = (h.solar_mw / maxSolar * 100).toFixed(1);
-        tableHtml += `<tr>
-          <td class="fc-time">${localFmt.format(dt)}</td>
-          <td class="fc-time-est">${estFmt.format(dt)}</td>
-          <td class="fc-val">${h.wind_mw.toFixed(1)}</td>
-          <td class="fc-bar-cell"><div class="fc-bar fc-bar-wind" style="width:${wPct}%"></div></td>
-          <td class="fc-val">${h.solar_mw.toFixed(1)}</td>
-          <td class="fc-bar-cell"><div class="fc-bar fc-bar-solar" style="width:${sPct}%"></div></td>
-        </tr>`;
-      });
-
-      tableHtml += `</tbody></table>`;
+  // ── Build weather table rows ──────────────────────────────────
+  function buildWeatherRows(data) {
+    const tz = data.city_timezone;
+    const timeFmt = new Intl.DateTimeFormat('en-US', {
+      weekday: 'short', hour: '2-digit', minute: '2-digit',
+      hour12: false, timeZone: tz
     });
+    return data.hours.map(h => {
+      const t     = timeFmt.format(new Date(h.utc_iso + ':00Z'));
+      const temp  = h.temperature_2m     != null ? h.temperature_2m.toFixed(1)        : '–';
+      const wspd  = h.windspeed_10m      != null ? h.windspeed_10m.toFixed(1)         : '–';
+      const cloud = h.cloudcover         != null ? Math.round(h.cloudcover)           : '–';
+      const rad   = h.shortwave_radiation != null ? Math.round(h.shortwave_radiation) : '–';
+      return `<tr>
+        <td>${t}</td>
+        <td>${temp}</td>
+        <td>${wspd}</td>
+        <td>${cloud}</td>
+        <td>${rad}</td>
+      </tr>`;
+    }).join('');
+  }
 
-    tableHtml += `</div>`;
-
-    // Side-by-side layout: map on the left, table on the right
+  // ── Build forecast chart HTML ─────────────────────────────────
+  function buildForecastChartHTML(data) {
+    const mkt = esc(data.market);
+    const cty = esc(data.city);
+    const tz  = esc(data.city_timezone);
     return `
       <div class="forecast-layout">
-        <div class="forecast-map-wrap">
-          <div id="map-${esc(data.market)}" class="forecast-map"></div>
-          <div class="forecast-map-caption">
-            <strong>${esc(data.city)}</strong><br>
-            <small>${esc(data.city_timezone)}</small>
+
+        <!-- Left: map + weather module -->
+        <div class="forecast-left-col">
+          <div class="forecast-map-wrap">
+            <div id="map-${mkt}" class="forecast-map"></div>
+            <div class="forecast-map-caption">
+              <strong>${cty}</strong><br>
+              <small>${tz}</small>
+            </div>
+          </div>
+
+          <div class="weather-module">
+            <div class="weather-module-hdr">&#127757; Weather Forecast &mdash; Next 48 h</div>
+            <div class="weather-table-scroll">
+              <table class="weather-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Temp °C</th>
+                    <th>Wind km/h</th>
+                    <th>Cloud %</th>
+                    <th>Rad W/m²</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${buildWeatherRows(data)}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-        <div class="forecast-table-wrap">${tableHtml}</div>
-      </div>`;
+
+        <!-- Right: wind chart then solar chart -->
+        <div class="forecast-charts-col">
+
+          <div class="forecast-wrap forecast-wind">
+            <div class="forecast-meta">
+              &#128168; <strong>Wind Generation</strong> &nbsp;&middot;&nbsp;
+              ${cty} &nbsp;&middot;&nbsp; ${tz} &nbsp;&middot;&nbsp; Next 48 hours
+            </div>
+            <div style="padding:1.25rem 1.4rem 0.5rem;">
+              <canvas id="forecast-canvas-wind-${mkt}"></canvas>
+            </div>
+            <div class="download-row">
+              <button class="btn-download" onclick="downloadForecastCSV()">&#x2B07; Download CSV</button>
+              <button class="btn-download" onclick="downloadForecastChart('wind')">&#x2B07; Wind Chart (PNG)</button>
+            </div>
+          </div>
+
+          <div class="forecast-wrap forecast-solar">
+            <div class="forecast-meta">
+              &#9728; <strong>Solar Generation</strong> &nbsp;&middot;&nbsp;
+              ${cty} &nbsp;&middot;&nbsp; ${tz} &nbsp;&middot;&nbsp; Next 48 hours
+            </div>
+            <div style="padding:1.25rem 1.4rem 0.5rem;">
+              <canvas id="forecast-canvas-solar-${mkt}"></canvas>
+            </div>
+            <div class="download-row">
+              <button class="btn-download" onclick="downloadForecastChart('solar')">&#x2B07; Solar Chart (PNG)</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Shared chart options factory ──────────────────────────────
+  function chartOptions(yLabel) {
+    return {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${yLabel}: ${ctx.parsed.y.toFixed(1)} MW`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { maxRotation: 45, maxTicksLimit: 24, font: { size: 11 } },
+          grid:  { color: 'rgba(0,0,0,0.04)' }
+        },
+        y: {
+          title: { display: true, text: 'MW' },
+          grid:  { color: 'rgba(0,0,0,0.06)' },
+          beginAtZero: true
+        }
+      }
+    };
+  }
+
+  // ── Initialise two Chart.js instances ────────────────────────
+  function initForecastCharts(data) {
+    const tz = data.city_timezone;
+    const timeFmt = new Intl.DateTimeFormat('en-US', {
+      weekday: 'short', hour: '2-digit', minute: '2-digit',
+      hour12: false, timeZone: tz
+    });
+
+    const labels    = data.hours.map(h => timeFmt.format(new Date(h.utc_iso + ':00Z')));
+    const windData  = data.hours.map(h => h.wind_mw);
+    const solarData = data.hours.map(h => h.solar_mw);
+    const mkt       = data.market;
+
+    const windCanvas  = document.getElementById(`forecast-canvas-wind-${mkt}`);
+    const solarCanvas = document.getElementById(`forecast-canvas-solar-${mkt}`);
+
+    if (windCanvas) {
+      windChart = new Chart(windCanvas, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Wind MW',
+            data: windData,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246,0.13)',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+            borderWidth: 2,
+          }]
+        },
+        options: chartOptions('Wind MW')
+      });
+    }
+
+    if (solarCanvas) {
+      solarChart = new Chart(solarCanvas, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Solar MW',
+            data: solarData,
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245,158,11,0.13)',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+            borderWidth: 2,
+          }]
+        },
+        options: chartOptions('Solar MW')
+      });
+    }
+
+    window._lastForecastData = data;
+  }
+
+  // ── Download forecast CSV ─────────────────────────────────────
+  function downloadForecastCSV() {
+    const data = window._lastForecastData;
+    if (!data) return;
+
+    const tz = data.city_timezone;
+    const timeFmt = new Intl.DateTimeFormat('en-US', {
+      weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit', hour12: true,
+      timeZone: tz
+    });
+
+    let csv = 'Hour,Local Time,Wind MW,Solar MW\n';
+    data.hours.forEach((h, i) => {
+      const localTime = timeFmt.format(new Date(h.utc_iso + ':00Z'));
+      csv += `${i + 1},"${localTime}",${h.wind_mw.toFixed(2)},${h.solar_mw.toFixed(2)}\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `forecast_${data.market}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Download forecast chart as PNG ────────────────────────────
+  function downloadForecastChart(type) {
+    const chart  = type === 'solar' ? solarChart : windChart;
+    if (!chart) return;
+    const market = window._lastForecastData?.market ?? 'chart';
+    const url    = chart.toBase64Image('image/png', 1.0);
+    const a      = document.createElement('a');
+    a.href       = url;
+    a.download   = `forecast_${type}_${market}.png`;
+    a.click();
   }
 
   // ── Fuel card ─────────────────────────────────────────────────
@@ -1077,7 +1297,7 @@
         <div class="fuel-header">
           <span class="fuel-icon">${icon}</span>
           <span class="fuel-title">${label} Generation</span>
-          <span class="best-summary">★ Best: ${bestName} &nbsp; R² = ${m.best_r2}</span>
+          <span class="best-summary">&#9733; Best: ${bestName} &nbsp; R&sup2; = ${m.best_r2}</span>
         </div>
         <div class="model-grid">
           ${modelCol('Linear',     m.linear,     m.best_model === 'linear')}
@@ -1105,10 +1325,10 @@
       <div class="model-col">
         <div class="model-col-hdr">
           <h4>${name} Model</h4>
-          ${isBest ? '<span class="best-pill">★ Best</span>' : ''}
+          ${isBest ? '<span class="best-pill">&#9733; Best</span>' : ''}
         </div>
         <div class="r2-num" style="color:${barColor}">${m.r2}</div>
-        <div class="r2-meta">R² score &nbsp;·&nbsp; ${pct}% of variance explained</div>
+        <div class="r2-meta">R&sup2; score &nbsp;&middot;&nbsp; ${pct}% of variance explained</div>
         <div class="r2-bar-track">
           <div class="r2-bar-fill" style="width:${barPct}%; background:${barColor}"></div>
         </div>

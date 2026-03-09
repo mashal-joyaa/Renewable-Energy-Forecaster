@@ -88,10 +88,14 @@ def run_forecast(market: str, city: str) -> dict:
             solar_pred = float(max(0.0, solar_art["model"].predict(X_solar)[0]))
 
         hours.append({
-            "hour":     i + 1,
-            "utc_iso":  row["utc_iso"],
-            "wind_mw":  round(wind_pred,  1),
-            "solar_mw": round(solar_pred, 1),
+            "hour":                i + 1,
+            "utc_iso":             row["utc_iso"],
+            "wind_mw":             round(wind_pred,  1),
+            "solar_mw":            round(solar_pred, 1),
+            "temperature_2m":      row.get("temperature_2m"),
+            "windspeed_10m":       row.get("windspeed_10m"),
+            "cloudcover":          row.get("cloudcover"),
+            "shortwave_radiation": row.get("shortwave_radiation"),
         })
 
     return {
